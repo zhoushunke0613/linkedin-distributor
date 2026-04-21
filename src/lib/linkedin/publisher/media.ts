@@ -57,29 +57,41 @@ function hasAcceptedExtension(url: string): boolean {
   }
 }
 
+function unprocessable(message: string, body: string = ""): LinkedInApiError {
+  return new LinkedInApiError({
+    kind: "unprocessable",
+    status: 422,
+    body,
+    message,
+  });
+}
+
 async function fetchImageBytes(url: string): Promise<ArrayBuffer> {
   if (!hasAcceptedExtension(url)) {
-    throw new Error(
+    throw unprocessable(
       `unsupported media URL: ${url} — LinkedIn accepts only JPG, PNG, GIF`,
+      url,
     );
   }
   const res = await fetch(url);
   if (!res.ok) {
-    throw new Error(`image fetch failed: ${res.status} ${url}`);
+    throw unprocessable(`image fetch failed: ${res.status} ${url}`, url);
   }
   const contentType = (res.headers.get("content-type") ?? "")
     .split(";")[0]
     .trim()
     .toLowerCase();
   if (contentType && !ACCEPTED_CONTENT_TYPES.has(contentType)) {
-    throw new Error(
+    throw unprocessable(
       `unsupported content-type '${contentType}' for ${url} — LinkedIn accepts only JPG, PNG, GIF`,
+      url,
     );
   }
   const ab = await res.arrayBuffer();
   if (ab.byteLength > MAX_IMAGE_BYTES) {
-    throw new Error(
+    throw unprocessable(
       `image too large: ${ab.byteLength} bytes (max ${MAX_IMAGE_BYTES})`,
+      url,
     );
   }
   return ab;
