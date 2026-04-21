@@ -94,11 +94,7 @@ export default async function Home({
 
       <section className="mt-12">
         <h2 className="text-lg font-medium">Create draft</h2>
-        <form
-          action={createDraftAction}
-          encType="multipart/form-data"
-          className="mt-3 space-y-3"
-        >
+        <form action={createDraftAction} className="mt-3 space-y-3">
           <label className="block">
             <span className="text-sm text-gray-600">Text (max 3000 chars)</span>
             <textarea

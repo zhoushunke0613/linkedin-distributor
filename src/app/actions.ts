@@ -60,7 +60,14 @@ export async function createDraftAction(formData: FormData): Promise<void> {
 export async function deleteDraftAction(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
-  await deleteDraft(id);
+  try {
+    await deleteDraft(id);
+  } catch (err) {
+    console.error(
+      "deleteDraftAction failed:",
+      err instanceof Error ? err.message : err,
+    );
+  }
   revalidatePath("/");
 }
 
