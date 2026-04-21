@@ -77,6 +77,15 @@ async function handle(req: Request) {
       });
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
+      const errorPatch = JSON.stringify({
+        metricsError: { reason: reason.slice(0, 300), at: new Date().toISOString() },
+      });
+      await sql`
+        UPDATE linkedin_publication
+        SET meta = COALESCE(meta, '{}'::jsonb) || ${errorPatch}::jsonb,
+            last_metrics_at = NOW()
+        WHERE id = ${c.id}
+      `;
       outcomes.push({ id: c.id, ok: false, reason: reason.slice(0, 300) });
     }
   }
