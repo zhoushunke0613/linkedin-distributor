@@ -53,7 +53,37 @@ export async function createDraftAction(formData: FormData): Promise<void> {
     return;
   }
 
-  await createDraft(parsed.data);
+  const draft = await createDraft(parsed.data);
+
+  // Auto-publish: if the user checked the box, schedule a "publish now"
+  // publication right after the draft is saved.
+  if (String(formData.get("auto_publish") ?? "") === "on") {
+    const authorUrn = String(formData.get("auto_author_urn") ?? "").trim();
+    const kindRaw = String(formData.get("auto_kind") ?? "organic");
+    const kind: "organic" | "ads" = kindRaw === "ads" ? "ads" : "organic";
+    if (authorUrn) {
+      try {
+        const now = new Date();
+        await schedulePublication({
+          draftId: draft.id,
+          authorUrn,
+          kind,
+          windowStart: now,
+          windowEnd: now,
+        });
+      } catch (err) {
+        console.error(
+          "createDraftAction auto-publish schedule failed:",
+          err instanceof Error ? err.message : err,
+        );
+      }
+    } else {
+      console.error(
+        "createDraftAction auto-publish skipped: no authorUrn selected",
+      );
+    }
+  }
+
   revalidatePath("/");
 }
 

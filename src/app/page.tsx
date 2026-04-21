@@ -140,6 +140,56 @@ export default async function Home({
               className="mt-1 w-full rounded border border-gray-300 p-2 text-sm"
             />
           </label>
+
+          <fieldset className="rounded border border-gray-200 p-3">
+            <legend className="px-1 text-xs font-medium text-gray-600">
+              Auto-publish (optional)
+            </legend>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                name="auto_publish"
+                disabled={tokens.length === 0}
+              />
+              <span className="text-sm">
+                Immediately schedule a “publish now” publication after saving
+              </span>
+            </label>
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="text-xs text-gray-600">As</span>
+                <select
+                  name="auto_author_urn"
+                  defaultValue={tokens[0]?.authorUrn ?? ""}
+                  className="mt-1 block w-full rounded border border-gray-300 p-2 text-sm"
+                >
+                  {tokens.length === 0 && (
+                    <option value="">(connect first)</option>
+                  )}
+                  {tokens.map((t) => (
+                    <option key={t.authorUrn} value={t.authorUrn}>
+                      {t.displayName ?? t.authorUrn} ({t.ownerType})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs text-gray-600">Kind</span>
+                <select
+                  name="auto_kind"
+                  defaultValue="organic"
+                  className="mt-1 block w-full rounded border border-gray-300 p-2 text-sm"
+                >
+                  <option value="organic">Organic</option>
+                  <option value="ads">Ads (PR 6 — not yet live)</option>
+                </select>
+              </label>
+            </div>
+            <p className="mt-2 text-[11px] text-gray-500">
+              Leave the box unchecked to save the draft without publishing.
+            </p>
+          </fieldset>
+
           <button
             type="submit"
             className="rounded bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
