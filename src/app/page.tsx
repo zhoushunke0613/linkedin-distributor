@@ -1,5 +1,6 @@
 import { env } from "@/lib/env";
 import { listTokens } from "@/lib/linkedin/token_store";
+import { extractStoredMetrics } from "@/lib/linkedin/analytics";
 import { listDrafts } from "@/lib/drafts";
 import { listPublications } from "@/lib/publications";
 import {
@@ -284,6 +285,7 @@ export default async function Home({
                 <th className="py-2 pr-4">Author</th>
                 <th className="py-2 pr-4">Window</th>
                 <th className="py-2 pr-4">Platform URN</th>
+                <th className="py-2 pr-4">Engagement</th>
                 <th className="py-2 pr-4">Actions</th>
               </tr>
             </thead>
@@ -310,6 +312,9 @@ export default async function Home({
                   </td>
                   <td className="py-2 pr-4 font-mono text-xs">
                     {p.platformUrn ?? "—"}
+                  </td>
+                  <td className="py-2 pr-4 text-xs">
+                    <Engagement meta={p.meta} />
                   </td>
                   <td className="space-x-2 py-2 pr-4 text-xs">
                     {p.status === "scheduled" && (
@@ -361,6 +366,17 @@ export default async function Home({
         )}
       </section>
     </main>
+  );
+}
+
+function Engagement({ meta }: { meta: Record<string, unknown> | null }) {
+  const m = extractStoredMetrics(meta);
+  if (!m) return <span className="text-gray-400">—</span>;
+  const when = new Date(m.fetchedAt);
+  return (
+    <span title={`fetched ${when.toISOString()}`}>
+      ♡ {m.likes} · 💬 {m.comments}
+    </span>
   );
 }
 
