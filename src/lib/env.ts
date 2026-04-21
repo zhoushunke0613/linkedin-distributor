@@ -17,6 +17,7 @@ const Schema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((v) => v === "true"),
+  CRON_SECRET: z.string().min(16).optional(),
 });
 
 export const env = Schema.parse(process.env);

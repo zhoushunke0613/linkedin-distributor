@@ -1,0 +1,28 @@
+name: LinkedIn publish cron
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: linkedin-publish-cron
+  cancel-in-progress: false
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hit publish endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ secrets.VERCEL_APP_URL }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::warning::VERCEL_APP_URL or CRON_SECRET not set — skipping"
+            exit 0
+          fi
+          curl --fail-with-body --show-error --silent \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron/linkedin-publish"
+          echo
