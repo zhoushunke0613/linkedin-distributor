@@ -94,7 +94,11 @@ export default async function Home({
 
       <section className="mt-12">
         <h2 className="text-lg font-medium">Create draft</h2>
-        <form action={createDraftAction} className="mt-3 space-y-3">
+        <form
+          action={createDraftAction}
+          encType="multipart/form-data"
+          className="mt-3 space-y-3"
+        >
           <label className="block">
             <span className="text-sm text-gray-600">Text (max 3000 chars)</span>
             <textarea
@@ -108,7 +112,19 @@ export default async function Home({
           </label>
           <label className="block">
             <span className="text-sm text-gray-600">
-              Media URLs (one per line or comma-separated, optional)
+              Upload images (JPG / PNG / GIF, up to 10 MB each, optional)
+            </span>
+            <input
+              name="image_files"
+              type="file"
+              accept="image/jpeg,image/png,image/gif"
+              multiple
+              className="mt-1 block w-full text-sm file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:text-gray-800 hover:file:bg-gray-200"
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm text-gray-600">
+              …or paste public image URLs (one per line, optional)
             </span>
             <textarea
               name="media_urls"

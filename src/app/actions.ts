@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { env } from "@/lib/env";
 import { sql } from "@/lib/db";
+import { isBlobEnabled, uploadImageFile } from "@/lib/blob";
 import { CreateDraftSchema, createDraft, deleteDraft } from "@/lib/drafts";
 import { dispatchPublication } from "@/lib/linkedin/publisher/dispatch";
 import {
@@ -14,7 +15,7 @@ import {
 
 export async function createDraftAction(formData: FormData): Promise<void> {
   const rawMedia = String(formData.get("media_urls") ?? "").trim();
-  const mediaUrls = rawMedia
+  const urlMedia = rawMedia
     ? rawMedia
         .split(/[\n,]/)
         .map((s) => s.trim())
@@ -22,9 +23,29 @@ export async function createDraftAction(formData: FormData): Promise<void> {
         .map((url) => ({ url }))
     : [];
 
+  const uploadedMedia: { url: string }[] = [];
+  if (isBlobEnabled()) {
+    const files = formData.getAll("image_files");
+    for (const entry of files) {
+      if (entry instanceof File && entry.size > 0) {
+        try {
+          const { url } = await uploadImageFile(entry);
+          uploadedMedia.push({ url });
+        } catch (err) {
+          console.error(
+            "createDraftAction upload failed:",
+            entry.name,
+            err instanceof Error ? err.message : err,
+          );
+          return;
+        }
+      }
+    }
+  }
+
   const parsed = CreateDraftSchema.safeParse({
     text: String(formData.get("text") ?? ""),
-    mediaUrls,
+    mediaUrls: [...urlMedia, ...uploadedMedia],
     note: formData.get("note") ? String(formData.get("note")) : undefined,
   });
   if (!parsed.success) {
