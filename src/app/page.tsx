@@ -35,7 +35,15 @@ export default async function Home({
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12 font-sans">
-      <h1 className="text-2xl font-semibold">LinkedIn Distributor</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">LinkedIn Distributor</h1>
+        <a
+          href="/experiments"
+          className="text-sm text-[#0a66c2] hover:underline"
+        >
+          AI agent (experiments) →
+        </a>
+      </div>
       <p className="mt-2 text-sm text-gray-500">
         Connect a LinkedIn identity, create drafts, and schedule publications.
       </p>

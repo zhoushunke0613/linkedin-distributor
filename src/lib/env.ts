@@ -18,6 +18,14 @@ const Schema = z.object({
     .default("false")
     .transform((v) => v === "true"),
   CRON_SECRET: z.string().min(16).optional(),
+  API_KEY: z.string().min(16).optional(),
+  GENERATOR_PROVIDER: z
+    .enum(["gateway", "openai", "anthropic"])
+    .default("gateway"),
+  GENERATOR_MODEL: z.string().default("openai/gpt-5"),
+  OPENAI_API_KEY: z.string().optional(),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  AI_GATEWAY_API_KEY: z.string().optional(),
 });
 
 export const env = Schema.parse(process.env);
