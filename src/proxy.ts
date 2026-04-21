@@ -3,6 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 const REALM = "linkedin-distributor";
 
 export function proxy(req: NextRequest) {
+  const path = req.nextUrl.pathname;
+  if (path.startsWith("/api/cron/")) return NextResponse.next();
+
   const password = process.env.APP_ACCESS_PASSWORD;
   if (!password) return NextResponse.next();
 
