@@ -180,9 +180,19 @@ export default async function Home({
                     <input type="hidden" name="id" value={d.id} />
                     <button
                       type="submit"
+                      title={
+                        (pubsByDraft.get(d.id) ?? 0) > 0
+                          ? `Also removes ${pubsByDraft.get(d.id)} publication record(s). The LinkedIn post itself stays.`
+                          : "Delete this draft"
+                      }
                       className="text-xs text-red-600 hover:underline"
                     >
                       Delete
+                      {(pubsByDraft.get(d.id) ?? 0) > 0 && (
+                        <span className="ml-1 text-gray-400">
+                          (+{pubsByDraft.get(d.id)})
+                        </span>
+                      )}
                     </button>
                   </form>
                 </div>

@@ -64,18 +64,6 @@ export async function getDraft(id: string): Promise<Draft | null> {
 }
 
 export async function deleteDraft(id: string): Promise<void> {
-  const publishedRows = await sql`
-    SELECT COUNT(*)::int AS n FROM linkedin_publication
-    WHERE draft_id = ${id} AND status = 'published'
-  `;
-  const publishedCount = Number(
-    (publishedRows[0] as { n: number } | undefined)?.n ?? 0,
-  );
-  if (publishedCount > 0) {
-    throw new Error(
-      `cannot delete draft: it has ${publishedCount} published publication(s); keep the draft for audit history`,
-    );
-  }
   await sql`DELETE FROM linkedin_publication WHERE draft_id = ${id}`;
   await sql`DELETE FROM post_draft WHERE id = ${id}`;
 }
