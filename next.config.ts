@@ -7,6 +7,12 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "15mb",
     },
   },
+  // Ensure skill markdown files are included in the Vercel function bundle
+  // so runtime readdirSync + readFileSync works on the serverless function.
+  outputFileTracingIncludes: {
+    "/experiments/**": ["./src/skills/**/*.md"],
+    "/api/**": ["./src/skills/**/*.md"],
+  },
 };
 
 export default nextConfig;

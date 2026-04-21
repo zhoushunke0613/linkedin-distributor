@@ -7,6 +7,7 @@ import {
   buildHeadlineSystemPrompt,
   HOOK_TYPES,
 } from "./prompts";
+import { selectRelevantSkills, type ScoredSkill } from "./skills";
 import {
   getExperiment,
   insertVariants,
@@ -32,9 +33,16 @@ const BodyBatchSchema = z.object({
   variants: z.array(BodyVariantSchema),
 });
 
-async function generateHeadlines(experiment: Experiment) {
+async function generateHeadlines(
+  experiment: Experiment,
+  skills: ScoredSkill[],
+) {
   const learnings = await computeLearnings().catch(() => null);
-  const system = buildHeadlineSystemPrompt(experiment.platform, learnings);
+  const system = buildHeadlineSystemPrompt(
+    experiment.platform,
+    learnings,
+    skills,
+  );
   const prompt = buildGenerationPrompt({
     topic: experiment.topic,
     brief: experiment.brief,
@@ -54,13 +62,21 @@ async function generateHeadlines(experiment: Experiment) {
       hookType: v.hookType,
       charCount: v.text.length,
       generator: providerLabel(),
+      skillsUsed: skills.map((s) => s.skill.name),
     },
   }));
 }
 
-async function generateBodies(experiment: Experiment) {
+async function generateBodies(
+  experiment: Experiment,
+  skills: ScoredSkill[],
+) {
   const learnings = await computeLearnings().catch(() => null);
-  const system = buildBodySystemPrompt(experiment.platform, learnings);
+  const system = buildBodySystemPrompt(
+    experiment.platform,
+    learnings,
+    skills,
+  );
   const prompt = buildGenerationPrompt({
     topic: experiment.topic,
     brief: experiment.brief,
@@ -80,6 +96,7 @@ async function generateBodies(experiment: Experiment) {
       ctaKind: v.ctaKind,
       charCount: v.text.length,
       generator: providerLabel(),
+      skillsUsed: skills.map((s) => s.skill.name),
     },
   }));
 }
@@ -103,9 +120,15 @@ export async function runGeneration(
   await setExperimentStatus(experimentId, "generating");
 
   try {
+    const skills = selectRelevantSkills({
+      topic: experiment.topic,
+      brief: experiment.brief,
+      platform: experiment.platform,
+    });
+
     const [headlines, bodies] = await Promise.all([
-      generateHeadlines(experiment),
-      generateBodies(experiment),
+      generateHeadlines(experiment, skills),
+      generateBodies(experiment, skills),
     ]);
     await insertVariants(experimentId, headlines);
     await insertVariants(experimentId, bodies);
@@ -114,6 +137,11 @@ export async function runGeneration(
       provider: providerLabel(),
       headlineCount: headlines.length,
       bodyCount: bodies.length,
+      skillsUsed: skills.map((s) => ({
+        name: s.skill.name,
+        score: Number(s.score.toFixed(2)),
+        topicMatches: s.topicMatches,
+      })),
     });
     return {
       ok: true,

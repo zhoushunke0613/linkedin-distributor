@@ -1,4 +1,5 @@
 import type { LearningsReport } from "@/lib/learnings";
+import { renderSkillBody, type ScoredSkill } from "./skills";
 import type { Platform } from "./store";
 
 /**
@@ -54,6 +55,23 @@ const PLATFORM_RULES: Record<Platform, string> = {
   ].join("\n"),
 };
 
+function renderSkills(skills: ScoredSkill[]): string {
+  if (skills.length === 0) {
+    return "";
+  }
+  const blocks = skills.map((s) => {
+    const header = `### ${s.skill.name}`;
+    const tags =
+      s.topicMatches.length > 0
+        ? `(matched: ${s.topicMatches.join(", ")})`
+        : "(applies broadly)";
+    return `${header} ${tags}\n${renderSkillBody(s.skill)}`;
+  });
+  return ["## Domain skills (use these verbatim where relevant)", ...blocks].join(
+    "\n\n",
+  );
+}
+
 function renderLearnings(l: LearningsReport | null): string {
   if (!l || l.coveredSampleSize === 0) {
     return "No historical engagement data available yet — use general best practices.";
@@ -83,6 +101,7 @@ function renderLearnings(l: LearningsReport | null): string {
 export function buildHeadlineSystemPrompt(
   platform: Platform,
   learnings: LearningsReport | null,
+  skills: ScoredSkill[] = [],
 ): string {
   return [
     `You are a senior ${platform} content strategist.`,
@@ -99,13 +118,18 @@ export function buildHeadlineSystemPrompt(
     "- No emoji as the first character. No hashtags.",
     "- No generic openers like 'In today's world' or 'As a founder'.",
     "",
+    renderSkills(skills),
+    "",
     renderLearnings(learnings),
-  ].join("\n");
+  ]
+    .filter((s) => s !== "")
+    .join("\n");
 }
 
 export function buildBodySystemPrompt(
   platform: Platform,
   learnings: LearningsReport | null,
+  skills: ScoredSkill[] = [],
 ): string {
   return [
     `You are a senior ${platform} content strategist.`,
@@ -121,8 +145,12 @@ export function buildBodySystemPrompt(
     "- Tag each variant with its CTA kind.",
     "- Total length 400-1200 characters unless the platform forces shorter.",
     "",
+    renderSkills(skills),
+    "",
     renderLearnings(learnings),
-  ].join("\n");
+  ]
+    .filter((s) => s !== "")
+    .join("\n");
 }
 
 export function buildGenerationPrompt(args: {

@@ -82,6 +82,8 @@ export default async function ExperimentDetailPage({
         </div>
       )}
 
+      <SkillsUsed meta={experiment.generatorMeta} />
+
       {experiment.generatorMeta &&
         typeof experiment.generatorMeta.lastError === "string" && (
           <div className="mt-6 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900">
@@ -218,5 +220,49 @@ export default async function ExperimentDetailPage({
         </section>
       )}
     </main>
+  );
+}
+
+function SkillsUsed({
+  meta,
+}: {
+  meta: Record<string, unknown> | null;
+}) {
+  if (!meta || !Array.isArray(meta.skillsUsed)) return null;
+  const skills = meta.skillsUsed as Array<{
+    name: string;
+    score: number;
+    topicMatches: string[];
+  }>;
+  if (skills.length === 0) {
+    return (
+      <div className="mt-4 rounded border border-gray-200 bg-gray-50 p-3 text-xs text-gray-500">
+        No skill files matched this experiment. Add a skill to{" "}
+        <code>src/skills/</code> and regenerate to inject domain knowledge.
+      </div>
+    );
+  }
+  return (
+    <details className="mt-4">
+      <summary className="cursor-pointer text-xs text-gray-600 hover:underline">
+        Skills used in last generation ({skills.length})
+      </summary>
+      <ul className="mt-2 space-y-1 text-xs">
+        {skills.map((s) => (
+          <li
+            key={s.name}
+            className="rounded border border-gray-200 bg-gray-50 p-2"
+          >
+            <code className="font-mono">{s.name}</code> — score {s.score}
+            {s.topicMatches.length > 0 && (
+              <span className="text-gray-500">
+                {" "}
+                · matched: {s.topicMatches.join(", ")}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
