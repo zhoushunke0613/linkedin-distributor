@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { env } from "@/lib/env";
+import { sql } from "@/lib/db";
 import { CreateDraftSchema, createDraft, deleteDraft } from "@/lib/drafts";
 import { dispatchPublication } from "@/lib/linkedin/publisher/dispatch";
 import {
@@ -109,6 +110,41 @@ export async function cancelPublicationAction(
   const id = String(formData.get("id") ?? "");
   if (!id) return;
   await cancelPublication(id);
+  revalidatePath("/");
+}
+
+const UpdateMetricsSchema = z.object({
+  id: z.string().uuid(),
+  likes: z.coerce.number().int().min(0).max(1_000_000),
+  comments: z.coerce.number().int().min(0).max(1_000_000),
+});
+
+export async function updateMetricsAction(
+  formData: FormData,
+): Promise<void> {
+  const parsed = UpdateMetricsSchema.safeParse({
+    id: formData.get("id"),
+    likes: formData.get("likes"),
+    comments: formData.get("comments"),
+  });
+  if (!parsed.success) {
+    console.error("updateMetricsAction invalid input:", parsed.error.issues);
+    return;
+  }
+  const metricsPatch = JSON.stringify({
+    metrics: {
+      likes: parsed.data.likes,
+      comments: parsed.data.comments,
+      fetchedAt: new Date().toISOString(),
+      source: "manual",
+    },
+  });
+  await sql`
+    UPDATE linkedin_publication
+    SET meta = COALESCE(meta, '{}'::jsonb) || ${metricsPatch}::jsonb,
+        last_metrics_at = NOW()
+    WHERE id = ${parsed.data.id}
+  `;
   revalidatePath("/");
 }
 

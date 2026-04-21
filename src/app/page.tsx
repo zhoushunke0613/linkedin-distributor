@@ -9,6 +9,7 @@ import {
   schedulePublicationAction,
   cancelPublicationAction,
   publishPublicationAction,
+  updateMetricsAction,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -314,7 +315,11 @@ export default async function Home({
                     {p.platformUrn ?? "—"}
                   </td>
                   <td className="py-2 pr-4 text-xs">
-                    <Engagement meta={p.meta} />
+                    <Engagement
+                      publicationId={p.id}
+                      meta={p.meta}
+                      published={p.status === "published"}
+                    />
                   </td>
                   <td className="space-x-2 py-2 pr-4 text-xs">
                     {p.status === "scheduled" && (
@@ -369,14 +374,82 @@ export default async function Home({
   );
 }
 
-function Engagement({ meta }: { meta: Record<string, unknown> | null }) {
+function Engagement({
+  publicationId,
+  meta,
+  published,
+}: {
+  publicationId: string;
+  meta: Record<string, unknown> | null;
+  published: boolean;
+}) {
   const m = extractStoredMetrics(meta);
-  if (!m) return <span className="text-gray-400">—</span>;
-  const when = new Date(m.fetchedAt);
+  const source =
+    meta && typeof meta.metrics === "object" && meta.metrics !== null
+      ? (meta.metrics as Record<string, unknown>).source
+      : null;
+  const errorRaw =
+    meta && typeof meta.metricsError === "object" && meta.metricsError !== null
+      ? (meta.metricsError as Record<string, unknown>).reason
+      : null;
+
+  if (!published) return <span className="text-gray-400">—</span>;
+
   return (
-    <span title={`fetched ${when.toISOString()}`}>
-      ♡ {m.likes} · 💬 {m.comments}
-    </span>
+    <details>
+      <summary className="cursor-pointer list-none">
+        {m ? (
+          <span
+            title={`fetched ${new Date(m.fetchedAt).toISOString()}${
+              source === "manual" ? " (manual)" : ""
+            }`}
+          >
+            ♡ {m.likes} · 💬 {m.comments}
+            {source === "manual" && (
+              <span className="ml-1 text-gray-400">✎</span>
+            )}
+          </span>
+        ) : (
+          <span className="text-gray-400 hover:text-gray-600">
+            edit ↓
+            {typeof errorRaw === "string" && (
+              <span className="ml-1 text-red-400" title={errorRaw}>
+                ⚠
+              </span>
+            )}
+          </span>
+        )}
+      </summary>
+      <form action={updateMetricsAction} className="mt-2 space-y-1">
+        <input type="hidden" name="id" value={publicationId} />
+        <label className="block text-[10px] text-gray-500">
+          Likes
+          <input
+            type="number"
+            name="likes"
+            min={0}
+            defaultValue={m?.likes ?? 0}
+            className="ml-1 w-16 rounded border border-gray-300 px-1 text-xs"
+          />
+        </label>
+        <label className="block text-[10px] text-gray-500">
+          Comments
+          <input
+            type="number"
+            name="comments"
+            min={0}
+            defaultValue={m?.comments ?? 0}
+            className="ml-1 w-16 rounded border border-gray-300 px-1 text-xs"
+          />
+        </label>
+        <button
+          type="submit"
+          className="mt-1 rounded bg-gray-800 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-black"
+        >
+          Save
+        </button>
+      </form>
+    </details>
   );
 }
 
