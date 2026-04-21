@@ -3,6 +3,13 @@ import { classify, LinkedInApiError, withBackoff } from "./errors";
 
 const INIT_URL = "https://api.linkedin.com/rest/images?action=initializeUpload";
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const ACCEPTED_CONTENT_TYPES = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/gif",
+]);
+const ACCEPTED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif"];
 
 function apiHeaders(accessToken: string): Record<string, string> {
   return {
@@ -41,10 +48,33 @@ async function initUpload(
   return data.value;
 }
 
+function hasAcceptedExtension(url: string): boolean {
+  try {
+    const path = new URL(url).pathname.toLowerCase();
+    return ACCEPTED_EXTENSIONS.some((ext) => path.endsWith(ext));
+  } catch {
+    return false;
+  }
+}
+
 async function fetchImageBytes(url: string): Promise<ArrayBuffer> {
+  if (!hasAcceptedExtension(url)) {
+    throw new Error(
+      `unsupported media URL: ${url} — LinkedIn accepts only JPG, PNG, GIF`,
+    );
+  }
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`image fetch failed: ${res.status} ${url}`);
+  }
+  const contentType = (res.headers.get("content-type") ?? "")
+    .split(";")[0]
+    .trim()
+    .toLowerCase();
+  if (contentType && !ACCEPTED_CONTENT_TYPES.has(contentType)) {
+    throw new Error(
+      `unsupported content-type '${contentType}' for ${url} — LinkedIn accepts only JPG, PNG, GIF`,
+    );
   }
   const ab = await res.arrayBuffer();
   if (ab.byteLength > MAX_IMAGE_BYTES) {
