@@ -9,6 +9,10 @@ const Schema = z.object({
     .string()
     .regex(/^[0-9a-fA-F]{64}$/, "must be 64 hex chars (32 bytes)"),
   APP_BASE_URL: z.string().url(),
+  LINKEDIN_API_VERSION: z
+    .string()
+    .regex(/^\d{6}$/, "must be YYYYMM")
+    .default("202604"),
   LINKEDIN_PUBLISH_ENABLED: z
     .enum(["true", "false"])
     .default("false")

@@ -1,3 +1,4 @@
+import { env } from "@/lib/env";
 import { listTokens } from "@/lib/linkedin/token_store";
 import { listDrafts } from "@/lib/drafts";
 import { listPublications } from "@/lib/publications";
@@ -6,6 +7,7 @@ import {
   deleteDraftAction,
   schedulePublicationAction,
   cancelPublicationAction,
+  publishPublicationAction,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -282,14 +284,19 @@ export default async function Home({
                 <th className="py-2 pr-4">Author</th>
                 <th className="py-2 pr-4">Window</th>
                 <th className="py-2 pr-4">Platform URN</th>
-                <th className="py-2 pr-4"></th>
+                <th className="py-2 pr-4">Actions</th>
               </tr>
             </thead>
             <tbody>
               {publications.map((p) => (
-                <tr key={p.id} className="border-b last:border-0">
+                <tr key={p.id} className="border-b last:border-0 align-top">
                   <td className="py-2 pr-4">
                     <StatusBadge status={p.status} />
+                    {p.errorMessage && (
+                      <div className="mt-1 max-w-xs text-xs text-red-600">
+                        {p.errorMessage}
+                      </div>
+                    )}
                   </td>
                   <td className="py-2 pr-4">{p.kind}</td>
                   <td className="py-2 pr-4 font-mono text-xs">
@@ -304,23 +311,53 @@ export default async function Home({
                   <td className="py-2 pr-4 font-mono text-xs">
                     {p.platformUrn ?? "—"}
                   </td>
-                  <td className="py-2 pr-4">
+                  <td className="space-x-2 py-2 pr-4 text-xs">
                     {p.status === "scheduled" && (
-                      <form action={cancelPublicationAction}>
-                        <input type="hidden" name="id" value={p.id} />
-                        <button
-                          type="submit"
-                          className="text-xs text-red-600 hover:underline"
+                      <>
+                        <form
+                          action={publishPublicationAction}
+                          className="inline"
                         >
-                          Cancel
-                        </button>
-                      </form>
+                          <input type="hidden" name="id" value={p.id} />
+                          <button
+                            type="submit"
+                            disabled={!env.LINKEDIN_PUBLISH_ENABLED}
+                            title={
+                              env.LINKEDIN_PUBLISH_ENABLED
+                                ? "Publish to LinkedIn now"
+                                : "Set LINKEDIN_PUBLISH_ENABLED=true to enable"
+                            }
+                            className="rounded bg-[#0a66c2] px-2 py-1 font-medium text-white hover:bg-[#004182] disabled:cursor-not-allowed disabled:bg-gray-300"
+                          >
+                            Publish now
+                          </button>
+                        </form>
+                        <form
+                          action={cancelPublicationAction}
+                          className="inline"
+                        >
+                          <input type="hidden" name="id" value={p.id} />
+                          <button
+                            type="submit"
+                            className="text-red-600 hover:underline"
+                          >
+                            Cancel
+                          </button>
+                        </form>
+                      </>
                     )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        )}
+        {!env.LINKEDIN_PUBLISH_ENABLED && publications.length > 0 && (
+          <p className="mt-2 text-xs text-amber-700">
+            Publishing is disabled. Set{" "}
+            <code>LINKEDIN_PUBLISH_ENABLED=true</code> in <code>.env</code> and
+            restart the dev server to enable the “Publish now” button.
+          </p>
         )}
       </section>
     </main>

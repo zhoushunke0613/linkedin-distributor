@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { env } from "@/lib/env";
 import { CreateDraftSchema, createDraft, deleteDraft } from "@/lib/drafts";
+import { dispatchPublication } from "@/lib/linkedin/publisher/dispatch";
 import {
   cancelPublication,
   schedulePublication,
@@ -107,5 +109,23 @@ export async function cancelPublicationAction(
   const id = String(formData.get("id") ?? "");
   if (!id) return;
   await cancelPublication(id);
+  revalidatePath("/");
+}
+
+export async function publishPublicationAction(
+  formData: FormData,
+): Promise<void> {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  if (!env.LINKEDIN_PUBLISH_ENABLED) {
+    console.error(
+      "publishPublicationAction blocked: LINKEDIN_PUBLISH_ENABLED=false",
+    );
+    return;
+  }
+  const outcome = await dispatchPublication(id);
+  if (!outcome.ok) {
+    console.error("publish failed:", outcome.errorMessage);
+  }
   revalidatePath("/");
 }
