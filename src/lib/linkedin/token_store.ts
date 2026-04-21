@@ -11,9 +11,9 @@ export type StoredToken = {
   ownerType: OwnerType;
   displayName: string | null;
   accessToken: string;
-  refreshToken: string;
+  refreshToken: string | null;
   accessExpiresAt: Date;
-  refreshExpiresAt: Date;
+  refreshExpiresAt: Date | null;
   scopes: string;
 };
 
@@ -25,11 +25,13 @@ export async function upsertToken(args: {
 }): Promise<void> {
   const now = Date.now();
   const access = encrypt(args.token.access_token);
-  const refresh = encrypt(args.token.refresh_token);
+  const refresh = args.token.refresh_token
+    ? encrypt(args.token.refresh_token)
+    : null;
   const accessExpiresAt = new Date(now + args.token.expires_in * 1000);
-  const refreshExpiresAt = new Date(
-    now + args.token.refresh_token_expires_in * 1000,
-  );
+  const refreshExpiresAt = args.token.refresh_token_expires_in
+    ? new Date(now + args.token.refresh_token_expires_in * 1000)
+    : null;
 
   await sql`
     INSERT INTO linkedin_tokens (
@@ -41,8 +43,8 @@ export async function upsertToken(args: {
     ) VALUES (
       ${args.authorUrn}, ${args.ownerType}, ${args.displayName ?? null},
       ${access.ct}, ${access.iv},
-      ${refresh.ct}, ${refresh.iv},
-      ${accessExpiresAt.toISOString()}, ${refreshExpiresAt.toISOString()},
+      ${refresh?.ct ?? null}, ${refresh?.iv ?? null},
+      ${accessExpiresAt.toISOString()}, ${refreshExpiresAt?.toISOString() ?? null},
       ${args.token.scope}, NOW()
     )
     ON CONFLICT (author_urn) DO UPDATE SET
@@ -70,9 +72,14 @@ export async function loadToken(authorUrn: string): Promise<StoredToken | null> 
     ownerType: r.owner_type,
     displayName: r.display_name,
     accessToken: decrypt({ ct: r.access_token_ct, iv: r.access_token_iv }),
-    refreshToken: decrypt({ ct: r.refresh_token_ct, iv: r.refresh_token_iv }),
+    refreshToken:
+      r.refresh_token_ct && r.refresh_token_iv
+        ? decrypt({ ct: r.refresh_token_ct, iv: r.refresh_token_iv })
+        : null,
     accessExpiresAt: new Date(r.access_expires_at),
-    refreshExpiresAt: new Date(r.refresh_expires_at),
+    refreshExpiresAt: r.refresh_expires_at
+      ? new Date(r.refresh_expires_at)
+      : null,
     scopes: r.scopes,
   };
 }
@@ -91,7 +98,9 @@ export async function listTokens(): Promise<
     ownerType: r.owner_type,
     displayName: r.display_name,
     accessExpiresAt: new Date(r.access_expires_at),
-    refreshExpiresAt: new Date(r.refresh_expires_at),
+    refreshExpiresAt: r.refresh_expires_at
+      ? new Date(r.refresh_expires_at)
+      : null,
     scopes: r.scopes,
   }));
 }
@@ -104,8 +113,14 @@ export async function getFreshAccessToken(authorUrn: string): Promise<string> {
   if (token.accessExpiresAt.getTime() - Date.now() > ACCESS_REFRESH_MARGIN_MS) {
     return token.accessToken;
   }
-  if (token.refreshExpiresAt.getTime() <= Date.now()) {
-    throw new Error(`refresh token expired for ${authorUrn}, re-auth required`);
+  if (
+    !token.refreshToken ||
+    !token.refreshExpiresAt ||
+    token.refreshExpiresAt.getTime() <= Date.now()
+  ) {
+    throw new Error(
+      `re-auth required for ${authorUrn}: no valid refresh token`,
+    );
   }
   const fresh = await refreshAccessToken(token.refreshToken);
   await upsertToken({

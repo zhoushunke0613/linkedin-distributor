@@ -52,24 +52,26 @@ export default async function Home({
           <table className="mt-3 w-full text-sm">
             <thead className="border-b text-left text-gray-500">
               <tr>
-                <th className="py-2">URN</th>
-                <th className="py-2">Type</th>
-                <th className="py-2">Name</th>
-                <th className="py-2">Access expires</th>
-                <th className="py-2">Refresh expires</th>
+                <th className="py-2 pr-4">URN</th>
+                <th className="py-2 pr-4">Type</th>
+                <th className="py-2 pr-4">Name</th>
+                <th className="py-2 pr-4">Access expires</th>
+                <th className="py-2 pr-4">Refresh expires</th>
               </tr>
             </thead>
             <tbody>
               {tokens.map((t) => (
                 <tr key={t.authorUrn} className="border-b last:border-0">
                   <td className="py-2 font-mono text-xs">{t.authorUrn}</td>
-                  <td className="py-2">{t.ownerType}</td>
-                  <td className="py-2">{t.displayName ?? "—"}</td>
+                  <td className="py-2 pr-4">{t.ownerType}</td>
+                  <td className="py-2 pr-4">{t.displayName ?? "—"}</td>
                   <td className="py-2 text-xs">
                     {t.accessExpiresAt.toISOString().slice(0, 16)}Z
                   </td>
                   <td className="py-2 text-xs">
-                    {t.refreshExpiresAt.toISOString().slice(0, 16)}Z
+                    {t.refreshExpiresAt
+                      ? `${t.refreshExpiresAt.toISOString().slice(0, 16)}Z`
+                      : "—"}
                   </td>
                 </tr>
               ))}
