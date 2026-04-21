@@ -3,6 +3,7 @@ import { listTokens } from "@/lib/linkedin/token_store";
 import { extractStoredMetrics } from "@/lib/linkedin/analytics";
 import { listDrafts } from "@/lib/drafts";
 import { listPublications } from "@/lib/publications";
+import { computeLearnings } from "@/lib/learnings";
 import {
   createDraftAction,
   deleteDraftAction,
@@ -20,10 +21,11 @@ export default async function Home({
   searchParams: Promise<{ connected?: string }>;
 }) {
   const { connected } = await searchParams;
-  const [tokens, drafts, publications] = await Promise.all([
+  const [tokens, drafts, publications, learnings] = await Promise.all([
     listTokens().catch(() => []),
     listDrafts().catch(() => []),
     listPublications().catch(() => []),
+    computeLearnings().catch(() => null),
   ]);
 
   const pubsByDraft = new Map<string, number>();
@@ -392,7 +394,129 @@ export default async function Home({
           </p>
         )}
       </section>
+
+      <Learnings report={learnings} />
     </main>
+  );
+}
+
+function Learnings({
+  report,
+}: {
+  report: Awaited<ReturnType<typeof computeLearnings>> | null;
+}) {
+  if (!report) return null;
+  const {
+    sampleSize,
+    coveredSampleSize,
+    overallAvgEngagement,
+    byTextLength,
+    byHasMedia,
+    byDayOfWeek,
+    byHourOfDay,
+    byAuthor,
+    topPosts,
+  } = report;
+
+  return (
+    <section className="mt-12">
+      <h2 className="text-lg font-medium">Learnings</h2>
+      {sampleSize === 0 ? (
+        <p className="mt-3 text-sm text-gray-500">
+          No published posts yet. Come back after you publish and enter some
+          metrics.
+        </p>
+      ) : coveredSampleSize === 0 ? (
+        <p className="mt-3 text-sm text-gray-500">
+          {sampleSize} published post(s), but none have metrics yet. Expand the
+          Engagement cell on a published publication to enter likes + comments.
+        </p>
+      ) : (
+        <div className="mt-3 space-y-4 text-sm">
+          <div className="rounded bg-gray-50 p-3">
+            <div>
+              <strong>Sample:</strong> {coveredSampleSize} / {sampleSize} posts
+              have metrics
+            </div>
+            <div>
+              <strong>Overall avg engagement (likes + 3×comments):</strong>{" "}
+              {overallAvgEngagement.toFixed(1)}
+            </div>
+          </div>
+
+          <LearningTable title="By text length" rows={byTextLength} />
+          <LearningTable title="By media" rows={byHasMedia} />
+          <LearningTable title="By day of week (UTC)" rows={byDayOfWeek} />
+          <LearningTable title="By hour of day (UTC)" rows={byHourOfDay} />
+          {byAuthor.length > 1 && (
+            <LearningTable title="By author" rows={byAuthor} />
+          )}
+
+          {topPosts.length > 0 && (
+            <div>
+              <h3 className="mt-4 text-sm font-medium">
+                Top {topPosts.length} posts
+              </h3>
+              <ul className="mt-2 space-y-2 text-xs">
+                {topPosts.map((p) => (
+                  <li
+                    key={p.platformUrn}
+                    className="rounded border border-gray-200 p-2"
+                  >
+                    <div className="font-mono text-[10px] text-gray-500">
+                      {p.platformUrn}
+                    </div>
+                    <div className="mt-1">
+                      ♡ {p.likes} · 💬 {p.comments} · engagement{" "}
+                      <strong>{p.engagement}</strong>
+                    </div>
+                    <div className="mt-1 whitespace-pre-wrap text-gray-700">
+                      {p.textPreview}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+      <p className="mt-2 text-[10px] text-gray-400">
+        JSON: <code>GET /api/learnings</code>
+      </p>
+    </section>
+  );
+}
+
+function LearningTable({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: { label: string; n: number; avgEngagement: number }[];
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <div>
+      <h3 className="text-xs font-medium text-gray-500">{title}</h3>
+      <table className="mt-1 w-full text-xs">
+        <thead className="text-left text-gray-400">
+          <tr>
+            <th className="py-1">Bucket</th>
+            <th className="py-1">n</th>
+            <th className="py-1">Avg engagement</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.label} className="border-t border-gray-100">
+              <td className="py-1 pr-2">{r.label}</td>
+              <td className="py-1 pr-2">{r.n}</td>
+              <td className="py-1 pr-2">{r.avgEngagement.toFixed(1)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
