@@ -37,7 +37,16 @@ for (const file of files) {
   }
   console.log(`+ ${file}`);
   const body = readFileSync(join(migrationsDir, file), "utf8");
-  await sql.query(body);
+  const statements = body
+    .split("\n")
+    .map((line) => line.replace(/--.*$/, ""))
+    .join("\n")
+    .split(";")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  for (const stmt of statements) {
+    await sql.query(stmt);
+  }
   await sql`INSERT INTO _migrations (id) VALUES (${file})`;
 }
 
