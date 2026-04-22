@@ -151,7 +151,7 @@ export type SkillSelection = {
 
 export function selectRelevantSkills(
   ctx: { topic: string; brief?: string | null; platform: string },
-  budgetChars = 3000,
+  budgetChars = 15000,
 ): SkillSelection {
   const skills = loadSkills().filter((s) => s.role !== "schema");
   const scored = skills
