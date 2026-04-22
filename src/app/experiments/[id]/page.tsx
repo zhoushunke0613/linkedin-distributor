@@ -146,6 +146,7 @@ export default async function ExperimentDetailPage({
                             ✓ used in a draft
                           </div>
                         )}
+                        <VariantAudit meta={v.meta} />
                       </div>
                     </label>
                   );
@@ -186,6 +187,7 @@ export default async function ExperimentDetailPage({
                             ✓ used in a draft
                           </div>
                         )}
+                        <VariantAudit meta={v.meta} />
                       </div>
                     </label>
                   );
@@ -223,18 +225,44 @@ export default async function ExperimentDetailPage({
   );
 }
 
+type SkillRow = {
+  name: string;
+  role?: string;
+  phase?: string;
+  score: number;
+  topicMatches: string[];
+};
+
 function SkillsUsed({
   meta,
 }: {
   meta: Record<string, unknown> | null;
 }) {
-  if (!meta || !Array.isArray(meta.skillsUsed)) return null;
-  const skills = meta.skillsUsed as Array<{
-    name: string;
-    score: number;
-    topicMatches: string[];
-  }>;
-  if (skills.length === 0) {
+  if (!meta) return null;
+
+  // New shape (PR 11): skillsUsed is { plan, draft, critique }
+  // Old shape: skillsUsed is an array.
+  const skillsUsed = meta.skillsUsed;
+  const phases: { label: string; rows: SkillRow[] }[] = [];
+
+  if (
+    skillsUsed &&
+    typeof skillsUsed === "object" &&
+    !Array.isArray(skillsUsed)
+  ) {
+    const obj = skillsUsed as Record<string, unknown>;
+    for (const k of ["plan", "draft", "critique"] as const) {
+      const arr = Array.isArray(obj[k]) ? (obj[k] as SkillRow[]) : [];
+      phases.push({ label: k, rows: arr });
+    }
+  } else if (Array.isArray(skillsUsed)) {
+    phases.push({ label: "used", rows: skillsUsed as SkillRow[] });
+  } else {
+    return null;
+  }
+
+  const total = phases.reduce((n, p) => n + p.rows.length, 0);
+  if (total === 0) {
     return (
       <div className="mt-4 rounded border border-gray-200 bg-gray-50 p-3 text-xs text-gray-500">
         No skill files matched this experiment. Add a skill to{" "}
@@ -242,27 +270,98 @@ function SkillsUsed({
       </div>
     );
   }
+
+  const critiqueRan = meta.critiqueRan === true;
+
   return (
     <details className="mt-4">
       <summary className="cursor-pointer text-xs text-gray-600 hover:underline">
-        Skills used in last generation ({skills.length})
+        Generation trace ({total} skills{critiqueRan ? " · critique ran" : ""})
       </summary>
-      <ul className="mt-2 space-y-1 text-xs">
-        {skills.map((s) => (
-          <li
-            key={s.name}
-            className="rounded border border-gray-200 bg-gray-50 p-2"
-          >
-            <code className="font-mono">{s.name}</code> — score {s.score}
-            {s.topicMatches.length > 0 && (
-              <span className="text-gray-500">
-                {" "}
-                · matched: {s.topicMatches.join(", ")}
-              </span>
+      <div className="mt-2 space-y-3 text-xs">
+        {phases.map((p) => (
+          <div key={p.label}>
+            <div className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+              {p.label} phase ({p.rows.length})
+            </div>
+            {p.rows.length === 0 ? (
+              <div className="mt-1 text-[11px] text-gray-400">
+                (no skills matched for this phase)
+              </div>
+            ) : (
+              <ul className="mt-1 space-y-1">
+                {p.rows.map((s) => (
+                  <li
+                    key={s.name}
+                    className="rounded border border-gray-200 bg-gray-50 p-2"
+                  >
+                    <code className="font-mono">{s.name}</code>
+                    {s.role && (
+                      <span className="ml-1 text-gray-400">[{s.role}]</span>
+                    )}
+                    <span className="ml-2 text-gray-500">
+                      score {s.score}
+                    </span>
+                    {s.topicMatches && s.topicMatches.length > 0 && (
+                      <span className="text-gray-500">
+                        {" "}
+                        · matched: {s.topicMatches.join(", ")}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
             )}
-          </li>
+          </div>
         ))}
-      </ul>
+      </div>
+    </details>
+  );
+}
+
+function VariantAudit({ meta }: { meta: Record<string, unknown> | null }) {
+  if (!meta) return null;
+  const critiqued = meta.critiqued === true;
+  const changed = meta.critique_changed === true;
+  const note =
+    typeof meta.critique_note === "string"
+      ? (meta.critique_note as string)
+      : null;
+  const before =
+    typeof meta.text_before_critique === "string"
+      ? (meta.text_before_critique as string)
+      : null;
+  const skillsApplied = Array.isArray(meta.skillsApplied)
+    ? (meta.skillsApplied as string[])
+    : [];
+
+  if (!critiqued && skillsApplied.length === 0) return null;
+
+  return (
+    <details className="mt-2">
+      <summary className="cursor-pointer text-[10px] text-gray-400 hover:text-gray-600">
+        audit{changed ? " · revised" : critiqued ? " · unchanged" : ""}
+      </summary>
+      <div className="mt-1 space-y-1 text-[11px] text-gray-600">
+        {skillsApplied.length > 0 && (
+          <div>
+            <span className="text-gray-400">skills applied: </span>
+            <code className="font-mono">{skillsApplied.join(", ")}</code>
+          </div>
+        )}
+        {critiqued && note && (
+          <div>
+            <span className="text-gray-400">critique note: </span>
+            {note}
+          </div>
+        )}
+        {changed && before && (
+          <div className="mt-1 rounded bg-gray-50 p-2">
+            <div className="text-[10px] text-gray-400">before critique:</div>
+            <div className="whitespace-pre-wrap">{before}</div>
+          </div>
+        )}
+      </div>
     </details>
   );
 }

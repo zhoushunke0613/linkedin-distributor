@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { sql } from "@/lib/db";
+import { PostBriefSchema, type PostBrief } from "./brief";
 
 export const PlatformSchema = z.enum([
   "linkedin",
@@ -36,6 +37,7 @@ export const CreateExperimentSchema = z.object({
   constraints: z.record(z.string(), z.unknown()).optional(),
   headlineN: z.number().int().min(1).max(10).default(3),
   bodyN: z.number().int().min(1).max(10).default(3),
+  postBrief: PostBriefSchema.optional(),
 });
 export type CreateExperimentInput = z.infer<typeof CreateExperimentSchema>;
 
@@ -100,6 +102,20 @@ function rowToVariant(r: Record<string, unknown>): Variant {
 export async function createExperiment(
   input: CreateExperimentInput,
 ): Promise<Experiment> {
+  // Stash the structured post-brief inside the constraints JSONB column
+  // under a reserved "post_brief" key, so we can evolve the field set
+  // without a DB migration.
+  const mergedConstraints: Record<string, unknown> = {
+    ...(input.constraints ?? {}),
+  };
+  if (input.postBrief && Object.keys(input.postBrief).length > 0) {
+    mergedConstraints.post_brief = input.postBrief;
+  }
+  const constraintsValue =
+    Object.keys(mergedConstraints).length > 0
+      ? JSON.stringify(mergedConstraints)
+      : null;
+
   const rows = await sql`
     INSERT INTO experiment (
       platform, topic, brief, constraints, headline_n, body_n, status
@@ -107,7 +123,7 @@ export async function createExperiment(
       ${input.platform},
       ${input.topic},
       ${input.brief ?? null},
-      ${input.constraints ? JSON.stringify(input.constraints) : null}::jsonb,
+      ${constraintsValue}::jsonb,
       ${input.headlineN},
       ${input.bodyN},
       'draft'
@@ -115,6 +131,16 @@ export async function createExperiment(
     RETURNING *
   `;
   return rowToExperiment(rows[0]);
+}
+
+export function extractPostBrief(
+  constraints: Record<string, unknown> | null,
+): PostBrief | null {
+  if (!constraints) return null;
+  const pb = constraints.post_brief;
+  if (!pb || typeof pb !== "object") return null;
+  const parsed = PostBriefSchema.safeParse(pb);
+  return parsed.success ? parsed.data : null;
 }
 
 export async function setExperimentStatus(

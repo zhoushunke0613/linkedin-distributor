@@ -1,33 +1,53 @@
 # Skills
 
-Each `.md` file in this directory is a **skill** — a piece of domain knowledge
-the generator auto-injects into its system prompt when a new experiment matches
-the skill's triggers.
+Each subdirectory is a **skill** — a piece of domain knowledge or a checker
+the generator uses when producing LinkedIn post variants.
 
-## How it works
+## Folder structure
 
-1. When you create + generate an experiment, the generator reads the topic,
-   brief, and platform.
-2. For each skill file, it scores relevance:
-   - `triggers.platforms` must include the current platform (or be absent /
-     contain `*` to apply to all platforms).
-   - `triggers.topics` keywords are substring-matched against topic+brief.
-     Each match = 1 relevance point.
-   - `priority: high` adds +3 to the score; `medium` +1; `low` 0.
-3. Skills with a positive score are sorted highest-first and packed into the
-   prompt up to a ~3000 char budget.
+```
+src/skills/<skill-name>/
+  SKILL.md          # required — YAML front matter + markdown body
+  (optional sidecar files later, e.g. checklist.yaml, examples.md)
+```
 
-## Authoring a skill
+## Front matter fields
 
-1. Copy `example-domain-skill.md` to a new file, e.g. `my-brand-voice.md`.
-2. Fill in the YAML front matter and the markdown body.
-3. `git add` + commit + push. Vercel auto-deploys; the next `Generate
-   variants` run loads it automatically — no code change required.
+```yaml
+name: <unique>
+description: <one line>
+triggers:
+  platforms: ["linkedin", ...]   # or ["*"] to apply to all
+  topics: ["keyword1", "keyword2", ...]   # or ["*"] to always fire
+priority: high | medium | low
+role: knowledge | planner | checker | schema
+phase: plan | draft | critique
+max_chars: <optional int — truncate body above this length>
+```
 
-## Tips
+## Roles and phases
 
-- Keep each skill under ~800 chars (front matter can set `max_chars` to
-  enforce per-skill truncation).
-- One skill = one idea. Don't pile 10 unrelated POVs into one file.
-- Use examples of good + bad phrasing — LLMs learn style from examples.
-- Review `src/lib/experiments/skills.ts` if you want to tweak the scoring.
+- **role=knowledge** — static domain knowledge injected into the `draft`
+  phase system prompt. Used by the headline + body subagents.
+- **role=planner** — decision-helper content injected into the `plan`
+  phase prompt so subagents can route topic → audience → angle.
+- **role=checker** — critique rules applied by the second LLM pass
+  (critique phase) after the draft is produced. Can rewrite variants.
+- **role=schema** — input contract documents (like `shared-post-brief`).
+  Not injected into any prompt; used as a reference for the app's own
+  brief validation.
+
+## Adding a skill
+
+1. Create a new folder under `src/skills/` with a kebab-case name.
+2. Add a `SKILL.md` using the front matter above.
+3. `git add` + commit + push. Vercel redeploys; the next `Generate
+   variants` run loads the skill automatically — no code change needed.
+
+## Changing the execution order
+
+Execution is controlled by the `phase` field:
+`plan` → `draft` → `critique`.
+
+Within a phase, skills are selected and scored by the router in
+`src/lib/experiments/skills.ts`. Higher-scoring skills are fed first.

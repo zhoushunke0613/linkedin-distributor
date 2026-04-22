@@ -1,11 +1,8 @@
 import type { LearningsReport } from "@/lib/learnings";
+import { renderBriefForPrompt, type PostBrief } from "./brief";
 import { renderSkillBody, type ScoredSkill } from "./skills";
 import type { Platform } from "./store";
 
-/**
- * Hook types mirror growth-system's catalog. Each headline variant is
- * tagged with one so downstream analytics can tell which hook format wins.
- */
 export const HOOK_TYPES = [
   "data_shock",
   "pain_resonance",
@@ -55,21 +52,16 @@ const PLATFORM_RULES: Record<Platform, string> = {
   ].join("\n"),
 };
 
-function renderSkills(skills: ScoredSkill[]): string {
-  if (skills.length === 0) {
-    return "";
-  }
+function renderSkills(title: string, skills: ScoredSkill[]): string {
+  if (skills.length === 0) return "";
   const blocks = skills.map((s) => {
-    const header = `### ${s.skill.name}`;
     const tags =
       s.topicMatches.length > 0
         ? `(matched: ${s.topicMatches.join(", ")})`
         : "(applies broadly)";
-    return `${header} ${tags}\n${renderSkillBody(s.skill)}`;
+    return `### ${s.skill.name} ${tags}\n${renderSkillBody(s.skill)}`;
   });
-  return ["## Domain skills (use these verbatim where relevant)", ...blocks].join(
-    "\n\n",
-  );
+  return [`## ${title}`, ...blocks].join("\n\n");
 }
 
 function renderLearnings(l: LearningsReport | null): string {
@@ -82,7 +74,9 @@ function renderLearnings(l: LearningsReport | null): string {
   const topBucket = (title: string, rows: typeof l.byTextLength) => {
     const top = [...rows].sort((a, b) => b.avgEngagement - a.avgEngagement)[0];
     if (top && top.n >= 1) {
-      lines.push(`- Best ${title}: ${top.label} (n=${top.n}, avg=${top.avgEngagement.toFixed(1)})`);
+      lines.push(
+        `- Best ${title}: ${top.label} (n=${top.n}, avg=${top.avgEngagement.toFixed(1)})`,
+      );
     }
   };
   topBucket("text length", l.byTextLength);
@@ -98,11 +92,16 @@ function renderLearnings(l: LearningsReport | null): string {
   return lines.join("\n");
 }
 
-export function buildHeadlineSystemPrompt(
-  platform: Platform,
-  learnings: LearningsReport | null,
-  skills: ScoredSkill[] = [],
-): string {
+type BuildDraftPromptArgs = {
+  platform: Platform;
+  brief: PostBrief | null;
+  learnings: LearningsReport | null;
+  planSkills: ScoredSkill[];
+  draftSkills: ScoredSkill[];
+};
+
+export function buildHeadlineSystemPrompt(args: BuildDraftPromptArgs): string {
+  const { platform, brief, learnings, planSkills, draftSkills } = args;
   return [
     `You are a senior ${platform} content strategist.`,
     "Generate HEADLINES — the first 2-3 lines of a post, the hook that decides whether readers tap 'see more'.",
@@ -118,19 +117,22 @@ export function buildHeadlineSystemPrompt(
     "- No emoji as the first character. No hashtags.",
     "- No generic openers like 'In today's world' or 'As a founder'.",
     "",
-    renderSkills(skills),
+    "## Brief",
+    renderBriefForPrompt(brief),
     "",
+    renderSkills("Plan-phase skills (strategy + routing guidance)", planSkills),
+    "",
+    renderSkills("Draft-phase skills (domain knowledge)", draftSkills),
+    "",
+    "## Historical performance",
     renderLearnings(learnings),
   ]
     .filter((s) => s !== "")
     .join("\n");
 }
 
-export function buildBodySystemPrompt(
-  platform: Platform,
-  learnings: LearningsReport | null,
-  skills: ScoredSkill[] = [],
-): string {
+export function buildBodySystemPrompt(args: BuildDraftPromptArgs): string {
+  const { platform, brief, learnings, planSkills, draftSkills } = args;
   return [
     `You are a senior ${platform} content strategist.`,
     "Generate POST BODIES — the narrative below the hook, ending with a single CTA.",
@@ -145,8 +147,14 @@ export function buildBodySystemPrompt(
     "- Tag each variant with its CTA kind.",
     "- Total length 400-1200 characters unless the platform forces shorter.",
     "",
-    renderSkills(skills),
+    "## Brief",
+    renderBriefForPrompt(brief),
     "",
+    renderSkills("Plan-phase skills (strategy + routing guidance)", planSkills),
+    "",
+    renderSkills("Draft-phase skills (domain knowledge)", draftSkills),
+    "",
+    "## Historical performance",
     renderLearnings(learnings),
   ]
     .filter((s) => s !== "")
@@ -176,4 +184,33 @@ export function buildGenerationPrompt(args: {
     );
   }
   return lines.join("\n");
+}
+
+export type BuildCritiquePromptArgs = {
+  platform: Platform;
+  brief: PostBrief | null;
+  kind: "headline" | "body";
+  checkerSkills: ScoredSkill[];
+};
+
+export function buildCritiqueSystemPrompt(
+  args: BuildCritiquePromptArgs,
+): string {
+  const { platform, brief, kind, checkerSkills } = args;
+  return [
+    `You are a critical editor for ${platform} ${kind} variants.`,
+    "You receive a list of variants produced by a first-pass generator.",
+    "Your job: apply the checker skills below. For each variant, either keep the text unchanged or rewrite it per the rules.",
+    "Return the SAME number of variants you receive. Preserve each variant's ordering, hookType (for headlines) or ctaKind (for bodies), and any other tag.",
+    "Write a one-sentence critique_note per variant explaining what you changed and why. If no change was needed, set critique_note = 'unchanged'.",
+    "",
+    PLATFORM_RULES[platform],
+    "",
+    "## Brief",
+    renderBriefForPrompt(brief),
+    "",
+    renderSkills("Checker skills to apply (treat as binding rules)", checkerSkills),
+  ]
+    .filter((s) => s !== "")
+    .join("\n");
 }

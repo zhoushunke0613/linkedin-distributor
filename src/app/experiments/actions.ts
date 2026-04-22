@@ -14,16 +14,58 @@ import {
   listVariants,
   PlatformSchema,
 } from "@/lib/experiments/store";
+import { PostBriefSchema } from "@/lib/experiments/brief";
+
+function readOptionalString(formData: FormData, key: string): string | undefined {
+  const v = formData.get(key);
+  if (v === null) return undefined;
+  const s = String(v).trim();
+  return s === "" ? undefined : s;
+}
+
+function readOptionalBool(formData: FormData, key: string): boolean | undefined {
+  const v = formData.get(key);
+  if (v === null) return undefined;
+  const s = String(v).trim().toLowerCase();
+  if (s === "" || s === "auto") return undefined;
+  if (s === "true" || s === "on") return true;
+  if (s === "false" || s === "off") return false;
+  return undefined;
+}
 
 export async function createExperimentAction(
   formData: FormData,
 ): Promise<void> {
+  const postBriefRaw = {
+    target_audience: readOptionalString(formData, "target_audience"),
+    content_goal: readOptionalString(formData, "content_goal"),
+    topic_cluster: readOptionalString(formData, "topic_cluster"),
+    desired_tone: readOptionalString(formData, "desired_tone"),
+    use_controversial_take: readOptionalBool(
+      formData,
+      "use_controversial_take",
+    ),
+    require_question_close: readOptionalBool(formData, "require_question_close"),
+    product_reference_level: readOptionalString(
+      formData,
+      "product_reference_level",
+    ),
+    proof_level: readOptionalString(formData, "proof_level"),
+    length_preference: readOptionalString(formData, "length_preference"),
+  };
+  const cleanedBrief = Object.fromEntries(
+    Object.entries(postBriefRaw).filter(([, v]) => v !== undefined),
+  );
+  const postBriefParsed = PostBriefSchema.safeParse(cleanedBrief);
+  const postBrief = postBriefParsed.success ? postBriefParsed.data : undefined;
+
   const parsed = CreateExperimentSchema.safeParse({
     platform: String(formData.get("platform") ?? "linkedin"),
     topic: String(formData.get("topic") ?? ""),
-    brief: formData.get("brief") ? String(formData.get("brief")) : undefined,
+    brief: readOptionalString(formData, "brief"),
     headlineN: Number(formData.get("headline_n") ?? 3),
     bodyN: Number(formData.get("body_n") ?? 3),
+    postBrief,
   });
   if (!parsed.success) {
     console.error("createExperimentAction invalid:", parsed.error.issues);
