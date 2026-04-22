@@ -12,11 +12,11 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Force light mode — the UI is designed for a white background and does
+   not ship dark: variants for component colors. Re-enable later when we
+   theme components properly. */
+html {
+  color-scheme: light;
 }
 
 body {
